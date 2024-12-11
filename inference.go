@@ -3,44 +3,53 @@ package inference
 import (
 	"fmt"
 	log "github.com/sirupsen/logrus"
+	"slices"
 	"strings"
 )
 
 type Inference struct {
-	Description      string
-	Rules            []WeightedRule
-	FactID           string
-	FactValue        interface{}
-	IsValeCalculated bool
-	IsIDCalculated   bool
+	Description      string         `json:"description"`
+	Rules            []WeightedRule `json:"rules"`
+	FactID           string         `json:"fact_id"`
+	FactValue        interface{}    `json:"fact_value"`
+	IsValeCalculated bool           `json:"is_value_calculated"`
+	IsIDCalculated   bool           `json:"is_id_calculated"`
+	CountOfTrue      int            `json:"count_of_true"`
+	Probability      float64        `json:"probability"`
+	// The Probability of the inference being true,
+	// this is used to sort inferences
 }
 
-func (inf *Inference) infer(facts map[string]Fact) (string, interface{}, error) {
+func (inf *Inference) infer(facts map[string]Fact) (string, interface{}, []string, error) {
+	var derived []string
 	for _, rule := range inf.Rules {
-		result, err := rule.evaluate(facts)
+		result, d, err := rule.evaluate(facts)
 		if err != nil {
-			return "", nil, err
+			return "", nil, nil, err
 		}
 		if !result {
-			return "", nil, fmt.Errorf("rule %s is false", rule.Description)
+			return "", nil, nil, fmt.Errorf("rule %s is false", rule.Description)
 		}
+		derived = append(derived, d...)
 	}
 	id, err := inf.getFactID(facts)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
-	value, err := inf.getFactValue(facts)
+	value, d, err := inf.getFactValue(facts)
 	if err != nil {
-		return "", nil, err
+		return "", nil, nil, err
 	}
-	return id, value, nil
+	derived = append(derived, d...)
+	derived = unique(derived)
+	return id, value, derived, nil
 }
 
 func (inf *Inference) getFactID(facts map[string]Fact) (string, error) {
 	if !inf.IsIDCalculated {
 		return inf.FactID, nil
 	} else {
-		id, err := Calculate(inf.FactID, facts)
+		id, _, err := Calculate(inf.FactID, facts)
 		if err != nil {
 			return "", err
 		}
@@ -48,15 +57,16 @@ func (inf *Inference) getFactID(facts map[string]Fact) (string, error) {
 	}
 }
 
-func (inf *Inference) getFactValue(facts map[string]Fact) (interface{}, error) {
+func (inf *Inference) getFactValue(facts map[string]Fact) (interface{}, []string, error) {
+	var empty []string
 	if !inf.IsValeCalculated {
-		return inf.FactValue, nil
+		return inf.FactValue, empty, nil
 	} else {
-		value, err := Calculate(inf.FactValue.(string), facts)
+		value, derived, err := Calculate(inf.FactValue.(string), facts)
 		if err != nil {
-			return "", err
+			return "", empty, err
 		}
-		return value, nil
+		return value, derived, nil
 	}
 
 }
@@ -80,7 +90,7 @@ func (inf *Inference) Certainty(facts map[string]Fact) float64 {
 	accomplished := 0.0
 	for _, rule := range inf.Rules {
 		total += rule.Weight
-		_, err := rule.evaluate(facts)
+		_, _, err := rule.evaluate(facts)
 		if err != nil {
 			continue
 		}
@@ -88,13 +98,18 @@ func (inf *Inference) Certainty(facts map[string]Fact) float64 {
 	return accomplished / total
 }
 
+// PendingRules returns the rules that have not been achieved yet
+// sorted by weight
 func (inf *Inference) PendingRules(facts map[string]Fact) []WeightedRule {
 	var pending []WeightedRule
 	for _, rule := range inf.Rules {
-		_, err := rule.evaluate(facts)
+		_, _, err := rule.evaluate(facts)
 		if err != nil {
 			pending = append(pending, rule)
 		}
 	}
+	slices.SortFunc(pending, func(a, b WeightedRule) int {
+		return int(a.Weight - b.Weight)
+	})
 	return pending
 }

@@ -16,4 +16,6 @@ A Fact has a values set by itself depending on the nature of the fact these will
 ## State of the project
 The project is in the early stages of development; the first step is to create the representation
 
+## Representation
+the representation of the rules and facts will be done using the expr language.
 https://github.com/expr-lang/expr

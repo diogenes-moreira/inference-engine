@@ -20,12 +20,14 @@ func TestInference_IsNeeded(t *testing.T) {
 
 	kb := KnowledgeBase{
 		Inferences: []Inference{inference},
-		Facts:      map[string]Fact{"age": {ID: "age", Values: map[string]interface{}{"age": 20}}},
+		Facts:      map[string]Fact{"age": {ID: "age", Value: 20}},
 	}
 
 	if !inference.IsNeeded(kb.Facts) {
 		t.Errorf("Expected inference to be needed")
 	}
+
+	kb.Dump("test.json")
 }
 
 func TestInference_IsNeededFalse(t *testing.T) {
@@ -46,7 +48,7 @@ func TestInference_IsNeededFalse(t *testing.T) {
 
 	kb := KnowledgeBase{
 		Inferences: []Inference{inference},
-		Facts:      map[string]Fact{"can_vote": {ID: "can_vote", Values: map[string]interface{}{"can_vote": false}}},
+		Facts:      map[string]Fact{"can_vote": {ID: "can_vote", Value: false}},
 	}
 
 	if inference.IsNeeded(kb.Facts) {
@@ -65,7 +67,7 @@ func TestInference_Facts(t *testing.T) {
 			}},
 		},
 		FactID:           "can_vote",
-		FactValue:        "age.Values[\"value\"] >= 18",
+		FactValue:        "age.Value >= 18 && age.Value < 50",
 		IsIDCalculated:   false,
 		IsValeCalculated: true,
 	}
@@ -75,8 +77,13 @@ func TestInference_Facts(t *testing.T) {
 		Facts:      map[string]Fact{},
 	}
 
-	kb.AddFact(Fact{ID: "age", Values: map[string]interface{}{"value": 15}})
-	if _, ok := kb.Facts["can_vote"]; !ok {
+	kb.Start()
+	kb.AddFact(Fact{ID: "age", Value: 18})
+	if value, ok := kb.Facts["can_vote"]; !ok || value.Value != true {
+		t.Errorf("Expected fact to be inferred")
+	}
+	kb.AddFact(Fact{ID: "age", Value: 15})
+	if value, ok := kb.Facts["can_vote"]; !ok || value.Value != false {
 		t.Errorf("Expected fact to be inferred")
 	}
 }
