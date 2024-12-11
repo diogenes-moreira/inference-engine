@@ -67,7 +67,7 @@ func TestInference_Facts(t *testing.T) {
 			}},
 		},
 		FactID:           "can_vote",
-		FactValue:        "age.Value >= 18 && age.Value < 50",
+		FactValue:        "age >= 18 && age < 50",
 		IsIDCalculated:   false,
 		IsValeCalculated: true,
 	}

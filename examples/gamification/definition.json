@@ -1,0 +1,22 @@
+{
+  "inferences": [
+    {
+      "description": "Pizza Free",
+      "rules": [
+        {
+          "fact_target_id": "sales quantity",
+          "description": "Need to sell 10 pizzas",
+          "question": "",
+          "expression": "age \u003e= 18",
+          "Weight": 1
+        }
+      ],
+      "fact_id": "can_vote",
+      "fact_value": "age \u003e= 18",
+      "is_value_calculated": true,
+      "is_id_calculated": false,
+      "count_of_true": 0,
+      "probability": 0
+    }
+  ]
+}

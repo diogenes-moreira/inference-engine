@@ -5,7 +5,7 @@ import "testing"
 func TestRule(t *testing.T) {
 	rule := Rule{
 		Description: "Be of legal age",
-		Expression:  "age.Value >= 18",
+		Expression:  "age >= 18",
 	}
 
 	facts := map[string]Fact{"age": {ID: "age", Value: 20}}

@@ -7,14 +7,17 @@ import (
 )
 
 func Calculate(sExpression string, params map[string]Fact) (interface{}, []string, error) {
-	//TODO: Remove Value from Fact struct
-	expression, err := expr.Compile(sExpression, expr.Env(params))
+	par := make(map[string]interface{})
+	for k, v := range params {
+		par[k] = v.Value
+	}
+	expression, err := expr.Compile(sExpression, expr.Env(par))
 	out := make([]string, 0)
 	if err != nil {
 		return "", nil, err
 	}
 	fmt.Println(expression)
-	output, err := expr.Run(expression, params)
+	output, err := expr.Run(expression, par)
 	if err != nil {
 		return "", nil, err
 	}
@@ -22,23 +25,10 @@ func Calculate(sExpression string, params map[string]Fact) (interface{}, []strin
 	return output, out, nil
 }
 
-func extractFacts(node interface{}, out []string) []string {
-	//TODO: refactor this to use a visitor pattern
-	// Add More cases
-	member, ok := node.(*ast.MemberNode)
-	if ok {
-		out = extractFacts(member.Node, out)
-	}
-	binary, ok := node.(*ast.BinaryNode)
-	if ok {
-		out = extractFacts(binary.Left, out)
-		out = extractFacts(binary.Right, out)
-	}
-	identifier, ok := node.(*ast.IdentifierNode)
-	if ok {
-		out = append(out, identifier.Value)
-	}
-	return out
+func extractFacts(node ast.Node, out []string) []string {
+	visitor := &NodeVisitor{Dependencies: out}
+	ast.Walk(&node, visitor)
+	return visitor.Dependencies
 }
 
 func unique(slice []string) []string {
@@ -51,4 +41,15 @@ func unique(slice []string) []string {
 		}
 	}
 	return list
+}
+
+type NodeVisitor struct {
+	Dependencies []string
+}
+
+func (v *NodeVisitor) Visit(node *ast.Node) {
+	identifierNode, ok := (*node).(*ast.IdentifierNode)
+	if ok {
+		v.Dependencies = append(v.Dependencies, identifierNode.Value)
+	}
 }
