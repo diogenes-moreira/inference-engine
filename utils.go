@@ -1,9 +1,12 @@
 package inference
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/expr-lang/expr"
 	"github.com/expr-lang/expr/ast"
+	log "github.com/sirupsen/logrus"
+	"os"
 )
 
 func Calculate(sExpression string, params map[string]Fact) (interface{}, []string, error) {
@@ -51,5 +54,31 @@ func (v *NodeVisitor) Visit(node *ast.Node) {
 	identifierNode, ok := (*node).(*ast.IdentifierNode)
 	if ok {
 		v.Dependencies = append(v.Dependencies, identifierNode.Value)
+	}
+}
+
+func (kb *KnowledgeBase) Dump(filename string) {
+	data, err := json.Marshal(kb)
+	if err != nil {
+		log.Errorf("Error dumping knowledge base: %s", err)
+		return
+	}
+
+	file, err := os.Create(filename)
+	if err != nil {
+		log.Errorf("Error creating file: %s", err)
+		return
+	}
+	defer func(file *os.File) {
+		err := file.Close()
+		if err != nil {
+			log.Errorf("Error closing file: %s", err)
+		}
+	}(file)
+
+	_, err = file.Write(data)
+	if err != nil {
+		log.Errorf("Error writing to file: %s", err)
+		return
 	}
 }

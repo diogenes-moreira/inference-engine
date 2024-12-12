@@ -14,10 +14,13 @@ type Inference struct {
 	FactValue        interface{}    `json:"fact_value"`
 	IsValeCalculated bool           `json:"is_value_calculated"`
 	IsIDCalculated   bool           `json:"is_id_calculated"`
+	OverWrite        bool           `json:"overwrite"`
 	CountOfTrue      int            `json:"count_of_true"`
-	Probability      float64        `json:"probability"`
 	// The Probability of the inference being true,
-	// this is used to sort inferences
+	// this is used to sort inferences by probability
+	Probability float64 `json:"probability"`
+	// The order of the inference, this is used to sort the inferences
+	Order int `json:"order"`
 }
 
 func (inf *Inference) infer(facts map[string]Fact) (string, interface{}, []string, error) {
@@ -72,6 +75,9 @@ func (inf *Inference) getFactValue(facts map[string]Fact) (interface{}, []string
 }
 
 func (inf *Inference) IsNeeded(facts map[string]Fact) bool {
+	if inf.OverWrite {
+		return true
+	}
 	id, err := inf.getFactID(facts)
 	if err != nil {
 		log.Errorf("Error getting fact id: %s", err)

@@ -1,16 +1,16 @@
 package inference
 
 import (
-	"encoding/json"
 	log "github.com/sirupsen/logrus"
-	"os"
 	"slices"
 )
 
 type KnowledgeBase struct {
-	RunningCount int             `json:"runnings_count"`
-	Facts        map[string]Fact `json:"facts"`
-	Inferences   []Inference     `json:"inferences"`
+	RunningCount   int             `json:"runnings_count"`
+	Facts          map[string]Fact `json:"facts"`
+	Inferences     []Inference     `json:"inferences"`
+	Contradictions []Contradiction `json:"contradictions"`
+	Conclusions    []Conclusion    `json:"conclusions"`
 }
 
 // Start the knowledge base session
@@ -25,10 +25,14 @@ func (kb *KnowledgeBase) AddFact(fact Fact) {
 	kb.Facts[fact.ID] = fact
 	kb.RemoveDerivedFrom(fact.ID)
 	kb.Infer()
+	kb.ResolveContradictions()
 }
 
 // Infer runs all the inferences in the knowledge base
 func (kb *KnowledgeBase) Infer() {
+	slices.SortFunc(kb.Inferences, func(i, j Inference) int {
+		return i.Order - j.Order
+	})
 	for _, inference := range kb.Inferences {
 		if inference.IsNeeded(kb.Facts) {
 			id, value, derived, err := inference.infer(kb.Facts)
@@ -39,7 +43,12 @@ func (kb *KnowledgeBase) Infer() {
 				inference.CountOfTrue++
 				inference.Probability = (inference.Probability + float64(inference.CountOfTrue)/float64(kb.RunningCount)) / 2
 			}
-			kb.Facts[id] = Fact{ID: id, Value: value, DerivedFrom: derived}
+			var accumulative bool
+			f, ok := kb.Facts[id]
+			if ok {
+				accumulative = f.Accumulative
+			}
+			kb.Facts[id] = Fact{ID: id, Value: value, DerivedFrom: derived, Accumulative: accumulative}
 		}
 	}
 }
@@ -57,65 +66,44 @@ func (kb *KnowledgeBase) GetPendingInference() []Inference {
 	return pending
 }
 
-func (kb *KnowledgeBase) DumpInferences(filename string) {
-	data, err := json.Marshal(kb.Inferences)
-	if err != nil {
-		log.Errorf("Error dumping rules: %s", err)
-		return
-	}
-
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Errorf("Error creating file: %s", err)
-		return
-	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			log.Errorf("Error closing file: %s", err)
-		}
-	}(file)
-
-	_, err = file.Write(data)
-	if err != nil {
-		log.Errorf("Error writing to file: %s", err)
-		return
-	}
-
-}
-
-func (kb *KnowledgeBase) Dump(filename string) {
-	data, err := json.Marshal(kb)
-	if err != nil {
-		log.Errorf("Error dumping knowledge base: %s", err)
-		return
-	}
-
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Errorf("Error creating file: %s", err)
-		return
-	}
-	defer func(file *os.File) {
-		err := file.Close()
-		if err != nil {
-			log.Errorf("Error closing file: %s", err)
-		}
-	}(file)
-
-	_, err = file.Write(data)
-	if err != nil {
-		log.Errorf("Error writing to file: %s", err)
-		return
-	}
-}
-
 func (kb *KnowledgeBase) RemoveDerivedFrom(id string) {
 	for key, fact := range kb.Facts {
 		for _, derived := range fact.DerivedFrom {
-			if derived == id {
+			if derived == id && !fact.Accumulative {
 				delete(kb.Facts, key)
 			}
 		}
 	}
+}
+
+func (kb *KnowledgeBase) ResolveContradictions() {
+	for _, contradiction := range kb.Contradictions {
+		if contradiction.Detect(kb.Facts) {
+			contradiction.Resolve(kb)
+		}
+	}
+}
+
+func (kb *KnowledgeBase) GetTrueConclusions() []Conclusion {
+	var conclusions []Conclusion
+	for _, conclusion := range kb.Conclusions {
+		if conclusion.Assert(kb.Facts) {
+			conclusions = append(conclusions, conclusion)
+		}
+	}
+	return conclusions
+}
+
+func (kb *KnowledgeBase) GetFalseConclusions() []Conclusion {
+	var conclusions []Conclusion
+	for _, conclusion := range kb.Conclusions {
+		if !conclusion.Assert(kb.Facts) {
+			conclusions = append(conclusions, conclusion)
+		}
+	}
+	return conclusions
+}
+
+func (kb *KnowledgeBase) CertaintyForConclusion(conclusion Conclusion) float64 {
+	return conclusion.Certainty(kb.Facts)
 }
