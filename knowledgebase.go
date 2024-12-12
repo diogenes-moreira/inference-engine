@@ -16,8 +16,10 @@ type KnowledgeBase struct {
 // Start the knowledge base session
 // this is used to keep track of the number of times the knowledge base has
 // been used and change the probability of the inferences
+// also it clears the facts
 func (kb *KnowledgeBase) Start() {
 	kb.RunningCount++
+	kb.Facts = make(map[string]Fact)
 }
 
 // AddFact adds a fact to the knowledge base
@@ -53,6 +55,7 @@ func (kb *KnowledgeBase) Infer() {
 	}
 }
 
+// GetPendingInference returns all the inferences that are needed
 func (kb *KnowledgeBase) GetPendingInference() []Inference {
 	var pending []Inference
 	for _, inference := range kb.Inferences {
@@ -66,6 +69,7 @@ func (kb *KnowledgeBase) GetPendingInference() []Inference {
 	return pending
 }
 
+// RemoveDerivedFrom removes all the facts that are derived from a given fact
 func (kb *KnowledgeBase) RemoveDerivedFrom(id string) {
 	for key, fact := range kb.Facts {
 		for _, derived := range fact.DerivedFrom {
@@ -76,6 +80,7 @@ func (kb *KnowledgeBase) RemoveDerivedFrom(id string) {
 	}
 }
 
+// ResolveContradictions resolves all the contradictions in the knowledge base
 func (kb *KnowledgeBase) ResolveContradictions() {
 	for _, contradiction := range kb.Contradictions {
 		if contradiction.Detect(kb.Facts) {
@@ -84,6 +89,7 @@ func (kb *KnowledgeBase) ResolveContradictions() {
 	}
 }
 
+// GetTrueConclusions returns all the conclusions that are true
 func (kb *KnowledgeBase) GetTrueConclusions() []Conclusion {
 	var conclusions []Conclusion
 	for _, conclusion := range kb.Conclusions {
@@ -94,6 +100,7 @@ func (kb *KnowledgeBase) GetTrueConclusions() []Conclusion {
 	return conclusions
 }
 
+// GetFalseConclusions returns all the conclusions that are false
 func (kb *KnowledgeBase) GetFalseConclusions() []Conclusion {
 	var conclusions []Conclusion
 	for _, conclusion := range kb.Conclusions {
@@ -104,6 +111,7 @@ func (kb *KnowledgeBase) GetFalseConclusions() []Conclusion {
 	return conclusions
 }
 
+// CertaintyForConclusion returns the certainty of a conclusion
 func (kb *KnowledgeBase) CertaintyForConclusion(conclusion Conclusion) float64 {
 	return conclusion.Certainty(kb.Facts)
 }
