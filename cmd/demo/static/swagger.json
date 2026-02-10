@@ -1,0 +1,692 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Inference Engine API",
+    "description": "REST API for the forward-chaining inference engine with a 6-step deterministic pipeline that transforms input signals into validated, explainable outputs.",
+    "version": "1.0.0",
+    "license": {
+      "name": "MIT"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080",
+      "description": "Local development server"
+    }
+  ],
+  "paths": {
+    "/api/examples": {
+      "get": {
+        "tags": ["Examples"],
+        "summary": "List available pipeline examples",
+        "description": "Returns the list of pre-configured pipeline examples that can be loaded.",
+        "operationId": "listExamples",
+        "responses": {
+          "200": {
+            "description": "List of available examples",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ExampleInfo"
+                  }
+                },
+                "example": [
+                  {
+                    "id": "triage",
+                    "name": "Hospital Triage",
+                    "description": "Emergency room patient triage based on vital signs"
+                  },
+                  {
+                    "id": "gamification",
+                    "name": "Pizza Gamification",
+                    "description": "Pizza loyalty rewards based on accumulated sales"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipeline/load": {
+      "post": {
+        "tags": ["Pipeline"],
+        "summary": "Load a pipeline example",
+        "description": "Loads a pre-configured pipeline example by its ID. This initializes the knowledge base and pipeline, replacing any previously loaded configuration.",
+        "operationId": "loadPipeline",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoadRequest"
+              },
+              "example": {
+                "example_id": "triage"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pipeline loaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoadResponse"
+                },
+                "example": {
+                  "status": "loaded",
+                  "example": "triage"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid or unknown example ID",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "Unknown example: invalid_id"
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed (only POST accepted)"
+          },
+          "500": {
+            "description": "Failed to read or parse the pipeline configuration"
+          }
+        }
+      }
+    },
+    "/api/pipeline/run": {
+      "post": {
+        "tags": ["Pipeline"],
+        "summary": "Run the pipeline with input facts",
+        "description": "Executes the 6-step deterministic pipeline (Domain Detection → Intent Classification → Entity Extraction → Constraint Identification → Knowledge Application → Risk Analysis) on the provided input facts. A pipeline must be loaded first via `/api/pipeline/load`.",
+        "operationId": "runPipeline",
+        "requestBody": {
+          "required": true,
+          "description": "A map of fact IDs to Fact objects. Each fact represents an input signal for the pipeline.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": {
+                  "$ref": "#/components/schemas/Fact"
+                }
+              },
+              "example": {
+                "heart_rate": {
+                  "id": "heart_rate",
+                  "description": "Patient heart rate",
+                  "value": 120,
+                  "derived_from": [],
+                  "accumulative": false
+                },
+                "temperature": {
+                  "id": "temperature",
+                  "description": "Patient body temperature",
+                  "value": 39.5,
+                  "derived_from": [],
+                  "accumulative": false
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pipeline execution result with structured output",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No pipeline loaded or invalid input",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "examples": {
+                  "not_loaded": {
+                    "value": "No pipeline loaded. Call /api/pipeline/load first."
+                  },
+                  "invalid_input": {
+                    "value": "Invalid input: unexpected EOF"
+                  }
+                }
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed (only POST accepted)"
+          },
+          "500": {
+            "description": "Pipeline execution error"
+          }
+        }
+      }
+    },
+    "/api/pipeline/pending": {
+      "get": {
+        "tags": ["Pipeline"],
+        "summary": "Get pending inferences",
+        "description": "Returns inferences that still need facts to fire. Useful for determining what additional input facts the pipeline needs to reach conclusions.",
+        "operationId": "getPending",
+        "responses": {
+          "200": {
+            "description": "List of pending inferences sorted by probability",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Inference"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No pipeline loaded",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "No pipeline loaded"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pipeline/reset": {
+      "post": {
+        "tags": ["Pipeline"],
+        "summary": "Reset the pipeline state",
+        "description": "Resets the knowledge base (clears all facts) and re-initializes the pipeline. The loaded configuration is preserved.",
+        "operationId": "resetPipeline",
+        "responses": {
+          "200": {
+            "description": "Pipeline reset successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResetResponse"
+                },
+                "example": {
+                  "status": "reset"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No pipeline loaded",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                },
+                "example": "No pipeline loaded"
+              }
+            }
+          },
+          "405": {
+            "description": "Method not allowed (only POST accepted)"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ExampleInfo": {
+        "type": "object",
+        "description": "Metadata about a pre-configured pipeline example.",
+        "required": ["id", "name", "description"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the example",
+            "example": "triage"
+          },
+          "name": {
+            "type": "string",
+            "description": "Human-readable name",
+            "example": "Hospital Triage"
+          },
+          "description": {
+            "type": "string",
+            "description": "Brief description of what the example demonstrates",
+            "example": "Emergency room patient triage based on vital signs"
+          }
+        }
+      },
+      "LoadRequest": {
+        "type": "object",
+        "required": ["example_id"],
+        "properties": {
+          "example_id": {
+            "type": "string",
+            "description": "ID of the example to load",
+            "enum": ["triage", "gamification"]
+          }
+        }
+      },
+      "LoadResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "loaded"
+          },
+          "example": {
+            "type": "string",
+            "description": "The ID of the loaded example",
+            "example": "triage"
+          }
+        }
+      },
+      "ResetResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "reset"
+          }
+        }
+      },
+      "Fact": {
+        "type": "object",
+        "description": "Atomic unit of knowledge in the inference engine.",
+        "required": ["id", "value"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the fact",
+            "example": "heart_rate"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the fact",
+            "example": "Patient heart rate in BPM"
+          },
+          "value": {
+            "description": "The fact value (can be any type: string, number, boolean, etc.)",
+            "example": 120
+          },
+          "derived_from": {
+            "type": "array",
+            "description": "IDs of facts this fact was derived from",
+            "items": {
+              "type": "string"
+            }
+          },
+          "accumulative": {
+            "type": "boolean",
+            "description": "If true, this fact survives re-evaluation when source facts change",
+            "default": false
+          },
+          "source": {
+            "type": "string",
+            "description": "Provenance of the fact: user, extracted, inferred, input",
+            "example": "input"
+          }
+        }
+      },
+      "Inference": {
+        "type": "object",
+        "description": "A set of weighted rules that, when satisfied, produce a new fact.",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the inference"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/WeightedRule"
+            }
+          },
+          "fact_id": {
+            "type": "string",
+            "description": "ID of the fact produced when all rules pass"
+          },
+          "fact_value": {
+            "description": "Value of the produced fact (can be an Expr expression if is_value_calculated is true)"
+          },
+          "is_value_calculated": {
+            "type": "boolean",
+            "description": "If true, fact_value is an Expr expression evaluated at runtime"
+          },
+          "is_id_calculated": {
+            "type": "boolean",
+            "description": "If true, fact_id is an Expr expression evaluated at runtime"
+          },
+          "overwrite": {
+            "type": "boolean",
+            "description": "If true, the inference fires even if the target fact already exists"
+          },
+          "count_of_true": {
+            "type": "integer",
+            "description": "Number of times this inference has fired"
+          },
+          "probability": {
+            "type": "number",
+            "format": "double",
+            "description": "Running probability of the inference being true"
+          },
+          "order": {
+            "type": "integer",
+            "description": "Execution order (lower values run first)"
+          }
+        }
+      },
+      "WeightedRule": {
+        "type": "object",
+        "description": "A rule with an associated weight for probability calculations.",
+        "properties": {
+          "fact_target_id": {
+            "type": "string",
+            "description": "ID of the fact this rule evaluates"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the rule"
+          },
+          "question": {
+            "type": "string",
+            "description": "Question to ask the user when this rule is pending"
+          },
+          "expression": {
+            "type": "string",
+            "description": "Expr-lang expression evaluated against current facts"
+          },
+          "Weight": {
+            "type": "number",
+            "format": "double",
+            "description": "Weight of this rule for probability calculations"
+          }
+        }
+      },
+      "PipelineResult": {
+        "type": "object",
+        "description": "Structured output of the 6-step deterministic pipeline.",
+        "properties": {
+          "result": {
+            "type": "string",
+            "description": "Summary of conclusions reached (semicolon-separated)",
+            "example": "Patient requires immediate attention"
+          },
+          "reasoning": {
+            "$ref": "#/components/schemas/Reasoning"
+          },
+          "confidence": {
+            "type": "string",
+            "description": "Confidence level of the result",
+            "enum": ["high", "medium", "low"]
+          },
+          "follow_up": {
+            "$ref": "#/components/schemas/FollowUp"
+          },
+          "domain": {
+            "type": "string",
+            "description": "Detected business domain",
+            "enum": ["finance", "ecommerce", "infrastructure", "data", "aiml", "general"]
+          },
+          "intent": {
+            "$ref": "#/components/schemas/Intent"
+          },
+          "entities": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Entity"
+            },
+            "description": "Entities extracted from input facts"
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Constraint"
+            },
+            "description": "Active constraints identified"
+          },
+          "risks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Risk"
+            },
+            "description": "Risks detected during analysis"
+          },
+          "solutions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RankedSolution"
+            },
+            "description": "Ranked solutions based on scoring weights"
+          }
+        }
+      },
+      "Reasoning": {
+        "type": "object",
+        "description": "Explanation chain for a pipeline result.",
+        "properties": {
+          "signals": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Signals observed during pipeline execution"
+          },
+          "assumptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Assumptions made (e.g., relaxed soft constraints)"
+          },
+          "tradeoffs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Tradeoffs identified (e.g., unmet hard constraints, high risks)"
+          }
+        }
+      },
+      "FollowUp": {
+        "type": "object",
+        "description": "What's still needed after pipeline execution.",
+        "properties": {
+          "missing_data": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Fact IDs needed by pending inferences but not yet available"
+          },
+          "next_actions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Questions to ask the user based on pending rules"
+          }
+        }
+      },
+      "Intent": {
+        "type": "object",
+        "description": "Classified user intent.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": ["query", "decision", "analysis", "action"],
+            "description": "Type of intent detected"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description or the expression that matched"
+          },
+          "context": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Additional context for the intent"
+          }
+        }
+      },
+      "Entity": {
+        "type": "object",
+        "description": "An entity extracted from input facts.",
+        "properties": {
+          "fact_id": {
+            "type": "string",
+            "description": "ID of the fact created for this entity"
+          },
+          "value": {
+            "description": "Extracted value"
+          },
+          "source": {
+            "type": "string",
+            "description": "Source of the extraction"
+          },
+          "confidence": {
+            "type": "number",
+            "format": "double",
+            "description": "Confidence of the extraction (0-1)"
+          }
+        }
+      },
+      "Constraint": {
+        "type": "object",
+        "description": "A condition that should or must be satisfied.",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the constraint"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["hard", "soft"],
+            "description": "Hard constraints must be met; soft constraints can be relaxed"
+          },
+          "expression": {
+            "type": "string",
+            "description": "Expr-lang expression evaluated against facts"
+          },
+          "weight": {
+            "type": "number",
+            "format": "double",
+            "description": "Weight of the constraint"
+          }
+        }
+      },
+      "Risk": {
+        "type": "object",
+        "description": "A potential risk identified during analysis.",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Description of the risk"
+          },
+          "level": {
+            "type": "string",
+            "enum": ["high", "medium", "low"],
+            "description": "Severity level of the risk"
+          },
+          "expression": {
+            "type": "string",
+            "description": "Expr-lang expression that triggered the risk"
+          },
+          "mitigation": {
+            "type": "string",
+            "description": "Suggested mitigation action"
+          }
+        }
+      },
+      "RankedSolution": {
+        "type": "object",
+        "description": "A conclusion paired with multi-dimensional scoring.",
+        "properties": {
+          "conclusion": {
+            "$ref": "#/components/schemas/Conclusion"
+          },
+          "score": {
+            "$ref": "#/components/schemas/SolutionScore"
+          },
+          "composite_score": {
+            "type": "number",
+            "format": "double",
+            "description": "Weighted composite score used for ranking"
+          }
+        }
+      },
+      "Conclusion": {
+        "type": "object",
+        "description": "Asserts whether a set of expected facts hold.",
+        "properties": {
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of the conclusion"
+          },
+          "facts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Fact"
+            },
+            "description": "Facts that must hold for this conclusion to be true"
+          }
+        }
+      },
+      "SolutionScore": {
+        "type": "object",
+        "description": "Multi-dimensional scoring (all values 0-1).",
+        "properties": {
+          "business_impact": {
+            "type": "number",
+            "format": "double",
+            "description": "Business impact score (higher is better)"
+          },
+          "implementation_complexity": {
+            "type": "number",
+            "format": "double",
+            "description": "Implementation complexity (lower is better)"
+          },
+          "risk_level": {
+            "type": "number",
+            "format": "double",
+            "description": "Risk level (lower is better)"
+          },
+          "time_to_value": {
+            "type": "number",
+            "format": "double",
+            "description": "Time to value (higher is better)"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    {
+      "name": "Examples",
+      "description": "Pre-configured pipeline examples"
+    },
+    {
+      "name": "Pipeline",
+      "description": "Pipeline lifecycle: load, run, inspect, and reset"
+    }
+  ]
+}
