@@ -1,0 +1,137 @@
+{
+  "knowledge_base": {
+    "runnings_count": 0,
+    "facts": {
+      "sales": {
+        "id": "sales",
+        "value": 0,
+        "description": "accumulated sales",
+        "derived_from": [],
+        "accumulative": true
+      }
+    },
+    "inferences": [
+      {
+        "description": "Count pizza sales",
+        "rules": [
+          {
+            "fact_target_id": "sales",
+            "description": "Need to sell 1 pizza",
+            "question": "How many pizzas did you sell?",
+            "expression": "sale.Product == 'pizza'",
+            "Weight": 1
+          }
+        ],
+        "fact_id": "sales",
+        "fact_value": "sales+1",
+        "is_value_calculated": true,
+        "is_id_calculated": false,
+        "overwrite": true,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 0
+      },
+      {
+        "description": "Pizza Discount 25%",
+        "rules": [
+          {
+            "fact_target_id": "sales",
+            "description": "Need to sell 3 pizzas",
+            "question": "How many pizzas did you sell?",
+            "expression": "sales >= 3",
+            "Weight": 1
+          }
+        ],
+        "fact_id": "pizza_discount",
+        "fact_value": ".25",
+        "is_value_calculated": false,
+        "is_id_calculated": false,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 0
+      },
+      {
+        "description": "Pizza Discount 50%",
+        "rules": [
+          {
+            "fact_target_id": "sales",
+            "description": "Need to sell 5 pizzas",
+            "question": "How many pizzas did you sell?",
+            "expression": "sales >= 5",
+            "Weight": 1
+          }
+        ],
+        "fact_id": "pizza_discount",
+        "fact_value": ".50",
+        "is_value_calculated": false,
+        "is_id_calculated": false,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 1
+      },
+      {
+        "description": "Pizza Free",
+        "rules": [
+          {
+            "fact_target_id": "sales",
+            "description": "Need to sell 10 pizzas",
+            "question": "How many pizzas did you sell?",
+            "expression": "sales >= 10",
+            "Weight": 1
+          }
+        ],
+        "fact_id": "pizza_free",
+        "fact_value": "true",
+        "is_value_calculated": false,
+        "is_id_calculated": false,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 2
+      }
+    ],
+    "contradictions": [],
+    "conclusions": [
+      {
+        "description": "Customer earned 25% pizza discount",
+        "facts": [
+          {"id": "pizza_discount", "value": ".25"}
+        ]
+      },
+      {
+        "description": "Customer earned 50% pizza discount",
+        "facts": [
+          {"id": "pizza_discount", "value": ".50"}
+        ]
+      },
+      {
+        "description": "Customer earned a FREE pizza!",
+        "facts": [
+          {"id": "pizza_free", "value": "true"}
+        ]
+      }
+    ]
+  },
+  "domain_detector": {
+    "signals": {
+      "ecommerce": ["sale", "product", "price", "discount", "pizza"]
+    }
+  },
+  "intent_classifier": {
+    "rules": [
+      {
+        "expression": "sale.Product == 'pizza'",
+        "intent_type": "action",
+        "weight": 1.0
+      }
+    ]
+  },
+  "entity_extractor": {
+    "rules": []
+  },
+  "constraint_set": {
+    "constraints": []
+  },
+  "risk_analyzer": {
+    "risks": []
+  }
+}

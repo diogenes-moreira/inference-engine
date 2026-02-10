@@ -115,3 +115,25 @@ func (kb *KnowledgeBase) GetFalseConclusions() []Conclusion {
 func (kb *KnowledgeBase) CertaintyForConclusion(conclusion Conclusion) float64 {
 	return conclusion.Certainty(kb.Facts)
 }
+
+// GetMissingFactIDs returns fact IDs needed by pending inferences but absent from current facts
+func (kb *KnowledgeBase) GetMissingFactIDs() []string {
+	needed := make(map[string]bool)
+	for _, inf := range kb.Inferences {
+		if !inf.IsNeeded(kb.Facts) {
+			continue
+		}
+		for _, rule := range inf.Rules {
+			if rule.FactTargetID != "" {
+				if _, ok := kb.Facts[rule.FactTargetID]; !ok {
+					needed[rule.FactTargetID] = true
+				}
+			}
+		}
+	}
+	var result []string
+	for id := range needed {
+		result = append(result, id)
+	}
+	return result
+}

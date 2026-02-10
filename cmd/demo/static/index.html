@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inference Engine Pipeline Demo</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --surface: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #3b82f6;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 2rem;
+  }
+  h1 { font-size: 1.5rem; margin-bottom: 0.5rem; }
+  h2 { font-size: 1.1rem; color: var(--muted); margin-bottom: 1rem; font-weight: normal; }
+  h3 { font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); margin-bottom: 0.75rem; }
+  .container { max-width: 1200px; margin: 0 auto; }
+  .header { margin-bottom: 2rem; }
+
+  .controls {
+    display: flex; gap: 1rem; align-items: center; margin-bottom: 2rem;
+    flex-wrap: wrap;
+  }
+  select, button, input {
+    font-family: inherit; font-size: 0.875rem;
+    background: var(--surface); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.5rem 1rem; outline: none;
+  }
+  select:focus, input:focus { border-color: var(--accent); }
+  button {
+    background: var(--accent); border-color: var(--accent);
+    cursor: pointer; font-weight: 600;
+  }
+  button:hover { opacity: 0.9; }
+  button.secondary { background: var(--surface); border-color: var(--border); }
+
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+  @media (max-width: 768px) { .grid { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.5rem;
+  }
+
+  .fact-row {
+    display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;
+  }
+  .fact-row input { flex: 1; }
+  .fact-row input.key { max-width: 150px; }
+  .fact-row button { padding: 0.5rem; font-size: 0.75rem; background: var(--red); border-color: var(--red); }
+
+  .badge {
+    display: inline-block; padding: 0.25rem 0.75rem;
+    border-radius: 20px; font-size: 0.8rem; font-weight: 700;
+    text-transform: uppercase;
+  }
+  .badge.high { background: var(--green); color: #000; }
+  .badge.medium { background: var(--yellow); color: #000; }
+  .badge.low { background: var(--red); color: #fff; }
+
+  .result-section { margin-bottom: 1.5rem; }
+  .result-section:last-child { margin-bottom: 0; }
+
+  .result-value {
+    font-size: 1.2rem; font-weight: 700;
+    padding: 0.75rem; background: rgba(59,130,246,0.1);
+    border-radius: 6px; border-left: 3px solid var(--accent);
+  }
+
+  ul { list-style: none; padding: 0; }
+  ul li {
+    padding: 0.35rem 0; padding-left: 1rem;
+    position: relative; color: var(--muted); font-size: 0.85rem;
+  }
+  ul li::before {
+    content: '›'; position: absolute; left: 0; color: var(--accent);
+  }
+
+  .risk-item {
+    padding: 0.5rem 0.75rem; margin-bottom: 0.5rem;
+    border-radius: 4px; font-size: 0.85rem;
+  }
+  .risk-item.high { background: rgba(239,68,68,0.15); border-left: 3px solid var(--red); }
+  .risk-item.medium { background: rgba(234,179,8,0.15); border-left: 3px solid var(--yellow); }
+  .risk-item.low { background: rgba(34,197,94,0.15); border-left: 3px solid var(--green); }
+
+  .empty { color: var(--muted); font-style: italic; font-size: 0.85rem; }
+  .hint { font-size: 0.75rem; color: var(--muted); margin-top: 0.5rem; }
+  #output-panel { display: none; }
+
+  .presets { margin-bottom: 1rem; }
+  .presets button { font-size: 0.75rem; padding: 0.35rem 0.75rem; margin-right: 0.5rem; margin-bottom: 0.5rem; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Inference Engine Pipeline</h1>
+    <h2>6-step deterministic pipeline: Domain → Intent → Extract → Constrain → Infer → Risk</h2>
+  </div>
+
+  <div class="controls">
+    <select id="example-select">
+      <option value="">Select an example...</option>
+    </select>
+    <button onclick="loadExample()">Load</button>
+    <button onclick="runPipeline()">Run Pipeline</button>
+    <button class="secondary" onclick="resetPipeline()">Reset</button>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h3>Input Facts</h3>
+      <div class="presets" id="presets"></div>
+      <div id="facts-container"></div>
+      <button class="secondary" onclick="addFactRow()" style="margin-top: 0.5rem; font-size: 0.75rem;">+ Add Fact</button>
+      <div class="hint">Enter fact IDs and values. Numeric values are auto-detected.</div>
+    </div>
+
+    <div class="panel" id="output-panel">
+      <h3>Pipeline Result</h3>
+
+      <div class="result-section">
+        <h3>Result</h3>
+        <div class="result-value" id="result-text"></div>
+      </div>
+
+      <div class="result-section">
+        <h3>Confidence</h3>
+        <span class="badge" id="confidence-badge"></span>
+        <span id="domain-info" style="margin-left: 1rem; font-size: 0.8rem; color: var(--muted);"></span>
+        <span id="intent-info" style="margin-left: 1rem; font-size: 0.8rem; color: var(--muted);"></span>
+      </div>
+
+      <div class="result-section">
+        <h3>Reasoning</h3>
+        <ul id="signals-list"></ul>
+      </div>
+
+      <div class="result-section" id="tradeoffs-section" style="display:none;">
+        <h3>Tradeoffs</h3>
+        <ul id="tradeoffs-list"></ul>
+      </div>
+
+      <div class="result-section" id="risks-section" style="display:none;">
+        <h3>Risks</h3>
+        <div id="risks-container"></div>
+      </div>
+
+      <div class="result-section" id="followup-section" style="display:none;">
+        <h3>Follow-up</h3>
+        <ul id="followup-list"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const PRESETS = {
+  triage: [
+    {name: 'Critical Patient', facts: {temperature: 41, heart_rate: 130, systolic_bp: 80, oxygen_saturation: 88}},
+    {name: 'Moderate Patient', facts: {temperature: 39, heart_rate: 110, systolic_bp: 110, oxygen_saturation: 95}},
+    {name: 'Stable Patient', facts: {temperature: 37, heart_rate: 75, systolic_bp: 120, oxygen_saturation: 98}}
+  ],
+  gamification: [
+    {name: '1 Pizza Sale', facts: {sale: {Product: 'pizza', Price: 100}}},
+  ]
+};
+
+async function init() {
+  const resp = await fetch('/api/examples');
+  const examples = await resp.json();
+  const select = document.getElementById('example-select');
+  examples.forEach(ex => {
+    const opt = document.createElement('option');
+    opt.value = ex.id;
+    opt.textContent = ex.name + ' — ' + ex.description;
+    select.appendChild(opt);
+  });
+}
+
+function showPresets(exampleId) {
+  const container = document.getElementById('presets');
+  container.innerHTML = '';
+  const presets = PRESETS[exampleId] || [];
+  presets.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'secondary';
+    btn.textContent = p.name;
+    btn.onclick = () => applyPreset(p.facts);
+    container.appendChild(btn);
+  });
+}
+
+function applyPreset(facts) {
+  document.getElementById('facts-container').innerHTML = '';
+  Object.entries(facts).forEach(([key, val]) => {
+    addFactRow(key, typeof val === 'object' ? JSON.stringify(val) : String(val));
+  });
+}
+
+function addFactRow(key, value) {
+  const container = document.getElementById('facts-container');
+  const row = document.createElement('div');
+  row.className = 'fact-row';
+  row.innerHTML = `
+    <input class="key" type="text" placeholder="fact ID" value="${key || ''}">
+    <input class="value" type="text" placeholder="value" value="${value || ''}">
+    <button onclick="this.parentElement.remove()">×</button>
+  `;
+  container.appendChild(row);
+}
+
+async function loadExample() {
+  const exampleId = document.getElementById('example-select').value;
+  if (!exampleId) return;
+  const resp = await fetch('/api/pipeline/load', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({example_id: exampleId})
+  });
+  if (resp.ok) {
+    showPresets(exampleId);
+    document.getElementById('facts-container').innerHTML = '';
+    document.getElementById('output-panel').style.display = 'none';
+  }
+}
+
+function parseValue(s) {
+  s = s.trim();
+  if (s === 'true') return true;
+  if (s === 'false') return false;
+  const n = Number(s);
+  if (!isNaN(n) && s !== '') return n;
+  try { return JSON.parse(s); } catch(e) {}
+  return s;
+}
+
+async function runPipeline() {
+  const rows = document.querySelectorAll('.fact-row');
+  const facts = {};
+  rows.forEach(row => {
+    const key = row.querySelector('.key').value.trim();
+    const val = row.querySelector('.value').value;
+    if (key) {
+      facts[key] = {id: key, value: parseValue(val)};
+    }
+  });
+
+  const resp = await fetch('/api/pipeline/run', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(facts)
+  });
+
+  if (!resp.ok) {
+    alert('Error: ' + await resp.text());
+    return;
+  }
+
+  const result = await resp.json();
+  renderResult(result);
+}
+
+function renderResult(r) {
+  document.getElementById('output-panel').style.display = 'block';
+  document.getElementById('result-text').textContent = r.result;
+
+  const badge = document.getElementById('confidence-badge');
+  badge.textContent = r.confidence;
+  badge.className = 'badge ' + r.confidence;
+
+  document.getElementById('domain-info').textContent = 'Domain: ' + r.domain;
+  document.getElementById('intent-info').textContent = 'Intent: ' + (r.intent?.type || 'n/a');
+
+  const signalsList = document.getElementById('signals-list');
+  signalsList.innerHTML = '';
+  (r.reasoning?.signals || []).forEach(s => {
+    const li = document.createElement('li');
+    li.textContent = s;
+    signalsList.appendChild(li);
+  });
+
+  const tradeoffs = r.reasoning?.tradeoffs || [];
+  const tradeoffsSection = document.getElementById('tradeoffs-section');
+  if (tradeoffs.length) {
+    tradeoffsSection.style.display = 'block';
+    const list = document.getElementById('tradeoffs-list');
+    list.innerHTML = '';
+    tradeoffs.forEach(t => {
+      const li = document.createElement('li');
+      li.textContent = t;
+      list.appendChild(li);
+    });
+  } else {
+    tradeoffsSection.style.display = 'none';
+  }
+
+  const risks = r.risks || [];
+  const risksSection = document.getElementById('risks-section');
+  if (risks.length) {
+    risksSection.style.display = 'block';
+    const container = document.getElementById('risks-container');
+    container.innerHTML = '';
+    risks.forEach(risk => {
+      const div = document.createElement('div');
+      div.className = 'risk-item ' + risk.level;
+      div.innerHTML = `<strong>${risk.level.toUpperCase()}</strong>: ${risk.description}` +
+        (risk.mitigation ? `<br><em style="color:var(--muted)">Mitigation: ${risk.mitigation}</em>` : '');
+      container.appendChild(div);
+    });
+  } else {
+    risksSection.style.display = 'none';
+  }
+
+  const missing = r.follow_up?.missing_data || [];
+  const actions = r.follow_up?.next_actions || [];
+  const followupSection = document.getElementById('followup-section');
+  if (missing.length || actions.length) {
+    followupSection.style.display = 'block';
+    const list = document.getElementById('followup-list');
+    list.innerHTML = '';
+    missing.forEach(m => {
+      const li = document.createElement('li');
+      li.textContent = 'Missing: ' + m;
+      list.appendChild(li);
+    });
+    actions.forEach(a => {
+      const li = document.createElement('li');
+      li.textContent = a;
+      list.appendChild(li);
+    });
+  } else {
+    followupSection.style.display = 'none';
+  }
+}
+
+async function resetPipeline() {
+  await fetch('/api/pipeline/reset', {method: 'POST'});
+  document.getElementById('output-panel').style.display = 'none';
+  document.getElementById('facts-container').innerHTML = '';
+}
+
+init();
+addFactRow();
+</script>
+</body>
+</html>

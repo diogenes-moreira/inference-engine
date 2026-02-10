@@ -6,6 +6,7 @@ type Fact struct {
 	Value        interface{} `json:"value"`
 	DerivedFrom  []string    `json:"derived_from"`
 	Accumulative bool        `json:"accumulative"`
+	Source       string      `json:"source,omitempty"`
 }
 
 func (f *Fact) Equal(other *Fact) bool {

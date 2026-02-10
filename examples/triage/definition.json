@@ -1,0 +1,255 @@
+{
+  "knowledge_base": {
+    "runnings_count": 0,
+    "facts": {},
+    "inferences": [
+      {
+        "description": "Detect fever",
+        "rules": [
+          {
+            "fact_target_id": "temperature",
+            "description": "Temperature above 38°C",
+            "question": "What is the patient's temperature?",
+            "expression": "temperature > 38",
+            "Weight": 1
+          }
+        ],
+        "fact_id": "fever",
+        "fact_value": true,
+        "is_value_calculated": false,
+        "is_id_calculated": false,
+        "overwrite": false,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 0
+      },
+      {
+        "description": "Detect tachycardia",
+        "rules": [
+          {
+            "fact_target_id": "heart_rate",
+            "description": "Heart rate above 100 bpm",
+            "question": "What is the patient's heart rate?",
+            "expression": "heart_rate > 100",
+            "Weight": 1
+          }
+        ],
+        "fact_id": "tachycardia",
+        "fact_value": true,
+        "is_value_calculated": false,
+        "is_id_calculated": false,
+        "overwrite": false,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 0
+      },
+      {
+        "description": "Detect hypotension",
+        "rules": [
+          {
+            "fact_target_id": "systolic_bp",
+            "description": "Systolic BP below 90 mmHg",
+            "question": "What is the patient's systolic blood pressure?",
+            "expression": "systolic_bp < 90",
+            "Weight": 1
+          }
+        ],
+        "fact_id": "hypotension",
+        "fact_value": true,
+        "is_value_calculated": false,
+        "is_id_calculated": false,
+        "overwrite": false,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 0
+      },
+      {
+        "description": "Detect low oxygen",
+        "rules": [
+          {
+            "fact_target_id": "oxygen_saturation",
+            "description": "SpO2 below 92%",
+            "question": "What is the patient's oxygen saturation?",
+            "expression": "oxygen_saturation < 92",
+            "Weight": 1
+          }
+        ],
+        "fact_id": "low_oxygen",
+        "fact_value": true,
+        "is_value_calculated": false,
+        "is_id_calculated": false,
+        "overwrite": false,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 0
+      },
+      {
+        "description": "Red triage - critical vitals",
+        "rules": [
+          {
+            "fact_target_id": "fever",
+            "description": "Patient has fever",
+            "expression": "fever == true",
+            "Weight": 0.3
+          },
+          {
+            "fact_target_id": "tachycardia",
+            "description": "Patient has tachycardia",
+            "expression": "tachycardia == true",
+            "Weight": 0.3
+          },
+          {
+            "fact_target_id": "hypotension",
+            "description": "Patient has hypotension",
+            "expression": "hypotension == true",
+            "Weight": 0.4
+          }
+        ],
+        "fact_id": "triage_level",
+        "fact_value": "red",
+        "is_value_calculated": false,
+        "is_id_calculated": false,
+        "overwrite": true,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 2
+      },
+      {
+        "description": "Yellow triage - elevated vitals",
+        "rules": [
+          {
+            "fact_target_id": "fever",
+            "description": "Patient has fever",
+            "expression": "fever == true",
+            "Weight": 0.5
+          },
+          {
+            "fact_target_id": "tachycardia",
+            "description": "Patient has tachycardia",
+            "expression": "tachycardia == true",
+            "Weight": 0.5
+          }
+        ],
+        "fact_id": "triage_level",
+        "fact_value": "yellow",
+        "is_value_calculated": false,
+        "is_id_calculated": false,
+        "overwrite": true,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 1
+      },
+      {
+        "description": "Green triage - stable",
+        "rules": [
+          {
+            "fact_target_id": "temperature",
+            "description": "Normal temperature",
+            "question": "What is the patient's temperature?",
+            "expression": "temperature <= 38",
+            "Weight": 1
+          }
+        ],
+        "fact_id": "triage_level",
+        "fact_value": "green",
+        "is_value_calculated": false,
+        "is_id_calculated": false,
+        "overwrite": false,
+        "count_of_true": 0,
+        "probability": 0,
+        "order": 0
+      }
+    ],
+    "contradictions": [
+      {
+        "description": "Cannot be both green and red triage",
+        "facts": [
+          {"id": "triage_level", "value": "green"},
+          {"id": "triage_level", "value": "red"}
+        ]
+      }
+    ],
+    "conclusions": [
+      {
+        "description": "CRITICAL: Immediate attention required (RED)",
+        "facts": [
+          {"id": "triage_level", "value": "red"}
+        ]
+      },
+      {
+        "description": "URGENT: Prompt evaluation needed (YELLOW)",
+        "facts": [
+          {"id": "triage_level", "value": "yellow"}
+        ]
+      },
+      {
+        "description": "STABLE: Standard evaluation (GREEN)",
+        "facts": [
+          {"id": "triage_level", "value": "green"}
+        ]
+      }
+    ]
+  },
+  "domain_detector": {
+    "signals": {
+      "general": ["temperature", "heart_rate", "blood_pressure", "oxygen", "symptom", "pain"]
+    }
+  },
+  "intent_classifier": {
+    "rules": [
+      {
+        "expression": "temperature > 0",
+        "intent_type": "decision",
+        "weight": 1.0
+      }
+    ]
+  },
+  "entity_extractor": {
+    "rules": [
+      {
+        "fact_id": "fever",
+        "expression": "temperature > 38",
+        "source": "vitals",
+        "confidence": 0.95
+      },
+      {
+        "fact_id": "tachycardia",
+        "expression": "heart_rate > 100",
+        "source": "vitals",
+        "confidence": 0.90
+      }
+    ]
+  },
+  "constraint_set": {
+    "constraints": [
+      {
+        "description": "Temperature must be in valid range",
+        "type": "hard",
+        "expression": "temperature >= 30 && temperature <= 45",
+        "weight": 1.0
+      }
+    ]
+  },
+  "risk_analyzer": {
+    "risks": [
+      {
+        "description": "Critical temperature (>40°C) - possible heatstroke or severe infection",
+        "level": "high",
+        "expression": "temperature > 40",
+        "mitigation": "Immediate cooling measures and IV access"
+      },
+      {
+        "description": "Severely elevated heart rate (>130 bpm)",
+        "level": "high",
+        "expression": "heart_rate > 130",
+        "mitigation": "Cardiac monitoring and 12-lead ECG"
+      },
+      {
+        "description": "Low oxygen saturation (<85%)",
+        "level": "high",
+        "expression": "oxygen_saturation < 85",
+        "mitigation": "Supplemental oxygen and respiratory assessment"
+      }
+    ]
+  }
+}
